@@ -5,15 +5,17 @@
 //  Created by Yordan Dimitrov on 05.04.24.
 //
 
+import SwiftData
 import SwiftUI
 
 struct ContentView: View {
-    @State private var friendsList: [User] = []
+    @Environment(\.modelContext) var modelContext
+    @Query(sort: \User.name) var users: [User]
     
     var body: some View {
         NavigationStack {
             List {
-                ForEach(friendsList, id: \.id) { friend in
+                ForEach(users, id: \.id) { friend in
                     HStack {
                         NavigationLink(value: friend) {
                             HStack {
@@ -27,7 +29,7 @@ struct ContentView: View {
             }
             .navigationTitle("FaceFriends")
             .navigationDestination(for: User.self) { user in
-                FriendDetailView(user: user)
+                UserDetailView(user: user)
             }
         }
         .task {
@@ -37,14 +39,22 @@ struct ContentView: View {
     
     func loadData() async  {
         
-        guard friendsList.isEmpty else { return }
-        
+        guard users.isEmpty else { return }
         let endpoint = "https://www.hackingwithswift.com/samples/friendface.json"
         guard let url = URL(string: endpoint) else { return }
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
+            
             let returnedData = try JSONDecoder().decode([User].self, from: data)
-            friendsList = returnedData
+            
+            let insertContext = ModelContext(modelContext.container)
+            
+            for user in returnedData {
+                insertContext.insert(user)
+            }
+            
+            try insertContext.save()
+            
         } catch {
             print("Invalid data")
         }
@@ -54,4 +64,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+        .modelContainer(for: User.self)
 }
